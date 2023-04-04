@@ -1,0 +1,35 @@
+---
+title: "Forecast daily electricity demand"
+author: "Biz Yoder"
+date: "2023-04-02"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,tidy.opts=list(width.cutoff=80), tidy=FALSE) 
+```
+
+```{r}
+#Import libraries
+library(readxl) #import excel
+library(dplyr) #pipes
+library(forecast) #time series
+```
+
+```{r}
+#Import load data
+load <- read_excel(path="./Data/load.xlsx") 
+```
+
+```{r}
+#Find daily load (average of hourly values)
+load_daily <- load %>%
+  mutate(daily_load = rowMeans(select(load, starts_with('h')), na.rm = TRUE))
+```
+
+```{r}
+#Construct time series object
+ts_daily <- msts(load_daily$daily_load, start = c(2005, 01, 01), end = c(2010, 12, 31),seasonal.periods = c(7,365.25))
+```
+
+
