@@ -1,6 +1,6 @@
 ---
 title: "Forecast daily electricity demand"
-author: "Biz Yoder"
+author: "Biz Yoder & Ryan McCord"
 date: "2023-04-02"
 output: pdf_document
 ---
