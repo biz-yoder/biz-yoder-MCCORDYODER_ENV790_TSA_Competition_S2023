@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE,tidy.opts=list(width.cutoff=80), tidy=FALSE)
 
 ```{r}
 #Import libraries
-library(readxl) #import excelhhh
+library(readxl) #import excel
 library(dplyr) #pipes
 library(forecast) #time series
 ```
