@@ -3,33 +3,69 @@ title: "Forecast daily electricity demand"
 author: "Biz Yoder & Ryan McCord"
 date: "2023-04-02"
 output: pdf_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,tidy.opts=list(width.cutoff=80), tidy=FALSE) 
 ```
 
-```{r}
+```{r setup, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center', echo=FALSE, include=FALSE}
 #Import libraries
 library(readxl) #import excel
 library(dplyr) #pipes
 library(forecast) #time series
+library(ggplot2)
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Import load data
 load <- read_excel(path="./Data/load.xlsx") 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Find daily load (average of hourly values)
 load_daily <- load %>%
   mutate(daily_load = rowMeans(select(load, starts_with('h')), na.rm = TRUE))
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Construct time series object
 ts_daily <- msts(load_daily$daily_load, start = c(2005, 01, 01), end = c(2010, 12, 31),seasonal.periods = c(7,365.25))
 ```
 
+## Modeling and Forecasting with complex seasonalities
+
+We learned some approaches to model series with a single seasonal pattern.
+
+* Moving Average, Naive Methods
+* Simple Exponential smoothing
+* Seasonal ARIMA
+* State Space models
+* ETS - Exponential smoothing state space model
+
+Today we will learn a few examples of models for multiple seasonal patterns.
+
+* ETS - another version of exponential smoothing (with 2 seasonal components)
+* ARIMA with dynamic harmonic fourier components - ARIMA model that can deal with multiple seasonal components
+* TBATS 
+* Neural Network
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
+#Visualize data
+summary(load_daily$daily_load)
+
+ggplot(load_daily, aes(x=load_daily$date,y=load_daily$daily_load)) +
+  geom_line() +
+  xlab("Date") +
+  ylab("Average Daily Household Power Demanded")
+  
+ts_daily %>% mstl() %>%
+  autoplot()
+```
+
+
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
+
+```
 
