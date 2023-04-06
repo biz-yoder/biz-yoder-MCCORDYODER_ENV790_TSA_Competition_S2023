@@ -79,3 +79,94 @@ autoplot(ts_daily_test)
 
 ```
 
+```{r}
+#Model 1 - STL + ETS model
+ETS_fit <-  stlf(ts_daily_train,h=365)
+
+#Plot foresting results
+autoplot(ETS_fit) + ylab("Power Demand")
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(ETS_fit, series="STL + ETS",PI=FALSE) +
+  ylab("Power Demand")
+
+#Run on full dataset to upload to Kaggle
+ETS_fit_full <- stlf(ts_daily, h=59)
+library(ggfortify)
+model1_ets <- fortify(ETS_fit_full)
+model1_ets_data <- model1_ets[1838:1896,4]
+date <- seq(as.Date("2011-01-01"), as.Date("2011-02-28"), by = "days")
+
+submission1 <- cbind.data.frame(date, model1_ets_data)
+names(submission1) <- c("date", "load")
+
+write.csv(submission1, "./Submissions/submission1.csv", row.names = FALSE)
+```
+
+```{r}
+#Model 2 - ARIMA with fourier terms
+ARIMA_four_fit <- auto.arima(ts_daily_train, 
+                             seasonal=FALSE, #we don't want the ARIMA to try and model the complex seasonality
+                             lambda=0,
+                             xreg=fourier(ts_daily_train, 
+                                          K=c(2,12)) 
+                             )
+
+ARIMA_four_for <- forecast(ARIMA_four_fit,
+                           xreg=fourier(ts_daily_train,
+                                        K=c(2,12),
+                                        h=365), #telling it you also need a forecast for the fourier external regressors, not just the fit -- so you add the h=### piece inside the fourier() function
+                           h=365
+                           ) 
+
+#Plot foresting results
+autoplot(ARIMA_four_for) + ylab("Power")
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(ARIMA_four_for, series="ARIMA_FOURIER",PI=FALSE) +
+  ylab("Power")
+
+ARIMA_four_full <- auto.arima(ts_daily, 
+                             seasonal=FALSE, #we don't want the ARIMA to try and model the complex seasonality
+                             lambda=0,
+                             xreg=fourier(ts_daily, 
+                                          K=c(2,12)) 
+                             )
+
+ARIMA_forecast_full <- forecast(ARIMA_four_full,
+                           xreg=fourier(ts_daily,
+                                        K=c(2,12),
+                                        h=59), #telling it you also need a forecast for the fourier external regressors, not just the fit -- so you add the h=### piece inside the fourier() function
+                           h=59
+                           ) 
+
+```
+
+```{r}
+model2 <- fortify(ARIMA_forecast_full)
+model2_data <- model2[1838:1896,4]
+
+submission2 <- cbind.data.frame(date, model2_data)
+names(submission2) <- c("date", "load")
+
+write.csv(submission2, "./Submissions/submission2.csv", row.names = FALSE)
+```
+
+```{r}
+# TBATS can take time to fit
+TBATS_fit <- tbats(ts_daily)
+
+TBATS_for <- forecast(TBATS_fit, h=59)
+
+model3 <- fortify(TBATS_for)
+model3_data <- model3[1838:1896,4]
+
+submission3 <- cbind.data.frame(date, model3_data)
+names(submission3) <- c("date", "load")
+
+write.csv(submission3, "./Submissions/submission3.csv", row.names = FALSE)
+
+```
+
