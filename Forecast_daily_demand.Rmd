@@ -66,6 +66,23 @@ ts_daily %>% mstl() %>%
 
 
 ```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
+#Separate into train and testing data
 
+load_daily_train <- load_daily$daily_load[1:1826]
+train_dates <- as.Date(load_daily$date[1:1826])
+load_daily_train <- cbind.data.frame(train_dates, load_daily_train)
+load_daily_test <- load_daily$daily_load[1827:2191]
+test_dates <- as.Date(load_daily$date[1827:2191])
+load_daily_test <- cbind.data.frame(test_dates, load_daily_test)
+
+#what is going on here???
+ts_daily_train <- msts(load_daily_train, start = c(2005, 01, 01), end = c(2009, 12, 31),seasonal.periods = c(7,365.25))
+
+ts_daily_test <- msts(load_daily_test, start = c(2010, 01, 01), end = c(2010, 12, 31),seasonal.periods = c(7,365.25)) #something weird with seasonality #s
+
+
+autoplot(ts_daily_train)
+autoplot(ts_daily_test)
+autoplot(ts_daily)
 ```
 
