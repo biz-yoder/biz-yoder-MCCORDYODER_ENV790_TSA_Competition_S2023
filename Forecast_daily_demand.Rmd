@@ -3,33 +3,86 @@ title: "Forecast daily electricity demand"
 author: "Biz Yoder & Ryan McCord"
 date: "2023-04-02"
 output: pdf_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,tidy.opts=list(width.cutoff=80), tidy=FALSE) 
 ```
 
-```{r}
+```{r setup, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center', echo=FALSE, include=FALSE}
 #Import libraries
 library(readxl) #import excel
 library(dplyr) #pipes
 library(forecast) #time series
+library(ggplot2)
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Import load data
 load <- read_excel(path="./Data/load.xlsx") 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Find daily load (average of hourly values)
 load_daily <- load %>%
   mutate(daily_load = rowMeans(select(load, starts_with('h')), na.rm = TRUE))
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Construct time series object
 ts_daily <- msts(load_daily$daily_load, start = c(2005, 01, 01), end = c(2010, 12, 31),seasonal.periods = c(7,365.25))
 ```
 
+## Modeling and Forecasting with complex seasonalities
+
+We learned some approaches to model series with a single seasonal pattern.
+
+* Moving Average, Naive Methods
+* Simple Exponential smoothing
+* Seasonal ARIMA
+* State Space models
+* ETS - Exponential smoothing state space model
+
+Today we will learn a few examples of models for multiple seasonal patterns.
+
+* ETS - another version of exponential smoothing (with 2 seasonal components)
+* ARIMA with dynamic harmonic fourier components - ARIMA model that can deal with multiple seasonal components
+* TBATS 
+* Neural Network
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
+#Visualize data
+summary(load_daily$daily_load)
+
+ggplot(load_daily, aes(x=load_daily$date,y=load_daily$daily_load)) +
+  geom_line() +
+  xlab("Date") +
+  ylab("Average Daily Household Power Demanded")
+  
+ts_daily %>% mstl() %>%
+  autoplot()
+```
+
+
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
+#Separate into train and testing data
+
+load_daily_train <- load_daily$daily_load[1:1826]
+train_dates <- as.Date(load_daily$date[1:1826])
+load_daily_train <- cbind.data.frame(train_dates, load_daily_train)
+load_daily_test <- load_daily$daily_load[1827:2191]
+test_dates <- as.Date(load_daily$date[1827:2191])
+load_daily_test <- cbind.data.frame(test_dates, load_daily_test)
+
+#what is going on here???
+ts_daily_train <- msts(load_daily_train, start = c(2005, 01, 01), end = c(2009, 12, 31),seasonal.periods = c(7,365.25))
+
+ts_daily_test <- msts(load_daily_test, start = c(2010, 01, 01), end = c(2010, 12, 31),seasonal.periods = c(7,365.25)) #something weird with seasonality #s
+
+
+autoplot(ts_daily_train)
+autoplot(ts_daily_test)
+autoplot(ts_daily)
+```
 
