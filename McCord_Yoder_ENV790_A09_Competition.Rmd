@@ -1,22 +1,20 @@
 ---
-title: "Forecast daily electricity demand"
+title: "Forecasting Competition"
 author: "Biz Yoder & Ryan McCord"
-date: "2023-04-02"
+date: "2023-04-24"
 output: pdf_document
 editor_options: 
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE,tidy.opts=list(width.cutoff=80), tidy=FALSE) 
-```
+>**Link to GitHub repository:** https://github.com/biz-yoder/biz-yoder-MCCORDYODER_ENV790_TSA_Competition_S2023.git
 
 ```{r setup, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center', echo=FALSE, include=FALSE}
 #Import libraries
 library(readxl) #import excel
 library(dplyr) #pipes
 library(forecast) #time series
-library(ggplot2)
+library(ggplot2) #plots
 ```
 
 ```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
@@ -35,22 +33,7 @@ load_daily <- load %>%
 ts_daily <- msts(load_daily$daily_load, start = c(2005, 01, 01), end = c(2010, 12, 31),seasonal.periods = c(7,365.25))
 ```
 
-## Modeling and Forecasting with complex seasonalities
 
-We learned some approaches to model series with a single seasonal pattern.
-
-* Moving Average, Naive Methods
-* Simple Exponential smoothing
-* Seasonal ARIMA
-* State Space models
-* ETS - Exponential smoothing state space model
-
-Today we will learn a few examples of models for multiple seasonal patterns.
-
-* ETS - another version of exponential smoothing (with 2 seasonal components)
-* ARIMA with dynamic harmonic fourier components - ARIMA model that can deal with multiple seasonal components
-* TBATS 
-* Neural Network
 ```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Visualize data
 summary(load_daily$daily_load)
@@ -64,7 +47,7 @@ ts_daily %>% mstl() %>%
   autoplot()
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Create train and test sets
 one_year = 365 #leave out one year of data for testing
 ##Create train ts 
@@ -79,7 +62,7 @@ autoplot(ts_daily_test)
 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Create time series for external regressors - TEMPERATURE
 temp <- read_excel(path="./Data/temperature.xlsx") 
 temp_daily <- temp %>%
@@ -107,12 +90,9 @@ ts_daily_temp_test <- subset(ts_daily_temp, start = length(ts_daily_temp)-one_ye
 
 autoplot(ts_daily_temp_train)
 autoplot(ts_daily_temp_test)
-
-#check correlation between temp and energy demand
-
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Model 1 - STL + ETS model
 ETS_fit <-  stlf(ts_daily_train,h=365)
 
@@ -137,7 +117,7 @@ names(submission1) <- c("date", "load")
 write.csv(submission1, "./Submissions/submission1.csv", row.names = FALSE)
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Model 1b - STL + ETS model
 ETS_fit2 <-  stlf(ts_daily_train, allow.multiplicative.trend=TRUE, h=365)
 
@@ -158,14 +138,12 @@ submission1b <- cbind.data.frame(date, model1b_ets_data)
 names(submission1b) <- c("date", "load")
 
 write.csv(submission1b, "./Submissions/submission1b.csv", row.names = FALSE)
-
-
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Model 2 - ARIMA with fourier terms
 ARIMA_four_fit <- auto.arima(ts_daily_train, 
-                             seasonal=FALSE, #we don't want the ARIMA to try and model the complex seasonality
+                             seasonal=FALSE, 
                              lambda=0,
                              xreg=fourier(ts_daily_train, 
                                           K=c(2,12)) 
@@ -174,7 +152,7 @@ ARIMA_four_fit <- auto.arima(ts_daily_train,
 ARIMA_four_for <- forecast(ARIMA_four_fit,
                            xreg=fourier(ts_daily_train,
                                         K=c(2,12),
-                                        h=365), #telling it you also need a forecast for the fourier external regressors, not just the fit -- so you add the h=### piece inside the fourier() function
+                                        h=365),
                            h=365
                            ) 
 
@@ -187,7 +165,7 @@ autoplot(ts_daily) +
   ylab("Power")
 
 ARIMA_four_full <- auto.arima(ts_daily, 
-                             seasonal=FALSE, #we don't want the ARIMA to try and model the complex seasonality
+                             seasonal=FALSE, 
                              lambda=0,
                              xreg=fourier(ts_daily, 
                                           K=c(2,12)) 
@@ -196,13 +174,13 @@ ARIMA_four_full <- auto.arima(ts_daily,
 ARIMA_forecast_full <- forecast(ARIMA_four_full,
                            xreg=fourier(ts_daily,
                                         K=c(2,12),
-                                        h=59), #telling it you also need a forecast for the fourier external regressors, not just the fit -- so you add the h=### piece inside the fourier() function
+                                        h=59),
                            h=59
                            ) 
 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 model2 <- fortify(ARIMA_forecast_full)
 model2_data <- model2[1838:1896,4]
 
@@ -212,8 +190,7 @@ names(submission2) <- c("date", "load")
 write.csv(submission2, "./Submissions/submission2.csv", row.names = FALSE)
 ```
 
-```{r}
-
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Model 2 - ARIMA with fourier terms
 ARIMA_four_fit_2b <- auto.arima(ts_daily_train, 
                              seasonal=FALSE,
@@ -261,7 +238,7 @@ write.csv(submission2b, "./Submissions/submission2b.csv", row.names = FALSE)
 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 # TBATS train
 TBATS_fit <- tbats(ts_daily_train)
 
@@ -286,14 +263,9 @@ submission3 <- cbind.data.frame(date, model3_data)
 names(submission3) <- c("date", "load")
 
 write.csv(submission3, "./Submissions/submission3.csv", row.names = FALSE)
-
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
-#You can play with the different values for p and P, you can also use xreg with Fourier term to model the multiple seasonality
-
-#Neural networks work well for non-linear methods
-
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #NN_fit <- nnetar(ts_act_power_daily_train,p=1,P=1)
 NN_fit <- nnetar(ts_daily_train)
 NN_for <- forecast(NN_fit, h=365)
@@ -314,10 +286,9 @@ submission4 <- cbind.data.frame(date, model4_data)
 names(submission4) <- c("date", "load")
 
 write.csv(submission4, "./Submissions/submission4.csv", row.names = FALSE)
-
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #Neural networks with fourier regressors -- use better fit from earlier models
 NN_fit_4b <- nnetar(ts_daily_train,xreg=fourier(ts_daily_train, K=c(2,6)))
 
@@ -339,11 +310,9 @@ submission4b <- cbind.data.frame(date, model4b_data)
 names(submission4b) <- c("date", "load")
 
 write.csv(submission4b, "./Submissions/submission4b.csv", row.names = FALSE)
-
 ```
 
-```{r}
-
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 #Model 5 - ARIMA with external regressors
 ARIMA_four_fit_5 <- auto.arima(ts_daily_train, 
                              seasonal=FALSE,
@@ -378,7 +347,7 @@ names(submission5) <- c("date", "load")
 write.csv(submission5, "./Submissions/submission5.csv", row.names = FALSE)
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 ARIMA_four_fit_5b <- auto.arima(ts_daily_train, 
                              seasonal=FALSE,
                              lambda=0,
@@ -424,7 +393,7 @@ names(submission5b) <- c("date", "load")
 write.csv(submission5b, "./Submissions/submission5b.csv", row.names = FALSE)
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #Neural networks with external regressors
 NN_fit_6 <- nnetar(ts_daily_train,xreg=ts_daily_temp_train)
 
@@ -446,10 +415,9 @@ submission6 <- cbind.data.frame(date, model6_data)
 names(submission6) <- c("date", "load")
 
 write.csv(submission6, "./Submissions/submission6.csv", row.names = FALSE)
-
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 NN_fit_7 <- nnetar(ts_daily_train,p=1,P=0,xreg=fourier(ts_daily_train, K=c(2,12)))
 
 NN_for_7 <- forecast(NN_fit_7, h=365,xreg=fourier(ts_daily_train, 
@@ -472,10 +440,9 @@ submission7 <- cbind.data.frame(date, model7_data)
 names(submission7) <- c("date", "load")
 
 write.csv(submission7, "./Submissions/submission7.csv", row.names = FALSE)
-
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #neural network with different fourier terms
 NN_fit_7b <- nnetar(ts_daily_train,p=1,P=0,xreg=fourier(ts_daily_train, K=c(2,4)))
 
@@ -499,10 +466,9 @@ submission7b <- cbind.data.frame(date, model7b_data)
 names(submission7b) <- c("date", "load")
 
 write.csv(submission7b, "./Submissions/submission7b.csv", row.names = FALSE)
-
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #same model but with different fourier parameters 
 NN_fit_7c <- nnetar(ts_daily_train,p=1,P=0,xreg=fourier(ts_daily_train, K=c(2,6)))
 
@@ -526,10 +492,9 @@ submission7c <- cbind.data.frame(date, model7c_data)
 names(submission7c) <- c("date", "load")
 
 write.csv(submission7c, "./Submissions/submission7c.csv", row.names = FALSE)
-
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #neural network with different fourier terms
 NN_fit_7d <- nnetar(ts_daily_train,p=1,P=1,xreg=fourier(ts_daily_train, K=c(2,4)))
 
@@ -553,15 +518,14 @@ submission7d <- cbind.data.frame(date, model7d_data)
 names(submission7d) <- c("date", "load")
 
 write.csv(submission7d, "./Submissions/submission7d.csv", row.names = FALSE)
-
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
 Acf(ts_daily, lag.max = 40)
 Pacf(ts_daily, lag.max=40)
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #neural network with lag 2
 NN_fit_8 <- nnetar(ts_daily_train,p=2,P=0,xreg=fourier(ts_daily_train, K=c(2,4)))
 
@@ -585,10 +549,9 @@ submission8 <- cbind.data.frame(date, model8_data)
 names(submission8) <- c("date", "load")
 
 write.csv(submission8, "./Submissions/submission8.csv", row.names = FALSE)
-
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #same as model 8, but with more repeats
 NN_fit_8b <- nnetar(ts_daily_train,p=2,P=0, repeats=50, xreg=fourier(ts_daily_train, K=c(2,4)))
 
@@ -614,7 +577,7 @@ names(submission8b) <- c("date", "load")
 write.csv(submission8b, "./Submissions/submission8b.csv", row.names = FALSE)
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #same as model 8, but with more repeats; lamda=auto
 NN_fit_8c <- nnetar(ts_daily_train,p=2,P=0, repeats=50,lambda="auto", xreg=fourier(ts_daily_train, K=c(2,4)))
 
@@ -641,7 +604,7 @@ write.csv(submission8c, "./Submissions/submission8c.csv", row.names = FALSE)
 ```
 
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #same as model 8, but with more repeats 
 NN_fit_8d <- nnetar(ts_daily_train,p=2,P=0, repeats=500, xreg=fourier(ts_daily_train, K=c(2,4)))
 
@@ -663,4 +626,34 @@ submission8d <- cbind.data.frame(date, model8d_data)
 names(submission8d) <- c("date", "load")
 
 write.csv(submission8d, "./Submissions/submission8d.csv", row.names = FALSE)
+```
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#Full dataset
+NN_fit_full_8e <- nnetar(ts_daily,p=2,P=0, repeats=50, xreg=fourier(ts_daily, K=c(2,4)))
+NN_for_full_8e <- forecast(NN_fit_full_8e, h=59,xreg=fourier(ts_daily, 
+                                          K=c(2,4),h=59))
+
+model8e <- fortify(NN_for_full_8e)
+model8e_data <- model8e[1838:1896,4]
+
+submission8e <- cbind.data.frame(date, model8e_data)
+names(submission8e) <- c("date", "load")
+
+write.csv(submission8e, "./Submissions/submission8e.csv", row.names = FALSE)
+```
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#Full dataset
+NN_fit_full_8f <- nnetar(ts_daily,p=3,P=0, repeats=50, xreg=fourier(ts_daily, K=c(2,4)))
+NN_for_full_8f <- forecast(NN_fit_full_8f, h=59,xreg=fourier(ts_daily, 
+                                          K=c(2,4),h=59))
+
+model8f <- fortify(NN_for_full_8f)
+model8f_data <- model8f[1838:1896,4]
+
+submission8f <- cbind.data.frame(date, model8f_data)
+names(submission8f) <- c("date", "load")
+
+write.csv(submission8f, "./Submissions/submission8f.csv", row.names = FALSE)
 ```
