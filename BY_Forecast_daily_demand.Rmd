@@ -559,11 +559,10 @@ write.csv(submission7d, "./Submissions/submission7d.csv", row.names = FALSE)
 ```{r}
 Acf(ts_daily, lag.max = 40)
 Pacf(ts_daily, lag.max=40)
-
 ```
 
 ```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
-#neural network with different fourier terms
+#neural network with lag 2
 NN_fit_8 <- nnetar(ts_daily_train,p=2,P=0,xreg=fourier(ts_daily_train, K=c(2,4)))
 
 NN_for_8 <- forecast(NN_fit_8, h=365,xreg=fourier(ts_daily_train, 
@@ -589,4 +588,79 @@ write.csv(submission8, "./Submissions/submission8.csv", row.names = FALSE)
 
 ```
 
+```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+#same as model 8, but with more repeats
+NN_fit_8b <- nnetar(ts_daily_train,p=2,P=0, repeats=50, xreg=fourier(ts_daily_train, K=c(2,4)))
 
+NN_for_8b <- forecast(NN_fit_8b, h=365,xreg=fourier(ts_daily_train, 
+                                          K=c(2,4),h=365)) 
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(NN_for_8b, series="Neural Network",PI=FALSE)+
+  ylab("Active Power")
+
+#Full dataset
+NN_fit_full_8b <- nnetar(ts_daily,p=2,P=0, repeats=50, xreg=fourier(ts_daily, K=c(2,4)))
+NN_for_full_8b <- forecast(NN_fit_full_8b, h=59,xreg=fourier(ts_daily, 
+                                          K=c(2,4),h=59))
+
+model8b <- fortify(NN_for_full_8b)
+model8b_data <- model8b[1838:1896,4]
+
+submission8b <- cbind.data.frame(date, model8b_data)
+names(submission8b) <- c("date", "load")
+
+write.csv(submission8b, "./Submissions/submission8b.csv", row.names = FALSE)
+```
+
+```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+#same as model 8, but with more repeats; lamda=auto
+NN_fit_8c <- nnetar(ts_daily_train,p=2,P=0, repeats=50,lambda="auto", xreg=fourier(ts_daily_train, K=c(2,4)))
+
+NN_for_8c <- forecast(NN_fit_8c, h=365,xreg=fourier(ts_daily_train, 
+                                          K=c(2,4),h=365)) 
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(NN_for_8c, series="Neural Network",PI=FALSE)+
+  ylab("Active Power")
+
+#Full dataset
+NN_fit_full_8c <- nnetar(ts_daily,p=2,P=0, repeats=50, lambda="auto", xreg=fourier(ts_daily, K=c(2,4)))
+NN_for_full_8c <- forecast(NN_fit_full_8c, h=59,xreg=fourier(ts_daily, 
+                                          K=c(2,4),h=59))
+
+model8c <- fortify(NN_for_full_8c)
+model8c_data <- model8c[1838:1896,4]
+
+submission8c <- cbind.data.frame(date, model8c_data)
+names(submission8c) <- c("date", "load")
+
+write.csv(submission8c, "./Submissions/submission8c.csv", row.names = FALSE)
+```
+
+
+```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+#same as model 8, but with more repeats 
+NN_fit_8d <- nnetar(ts_daily_train,p=2,P=0, repeats=500, xreg=fourier(ts_daily_train, K=c(2,4)))
+
+NN_for_8d <- forecast(NN_fit_8d, times=10000, h=365,xreg=fourier(ts_daily_train,K=c(2,4),h=365)) 
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(NN_for_8d, series="Neural Network",PI=FALSE)+
+  ylab("Active Power")
+
+#Full dataset
+NN_fit_full_8d <- nnetar(ts_daily,p=2,P=0, repeats=500, xreg=fourier(ts_daily, K=c(2,4)))
+NN_for_full_8d <- forecast(NN_fit_full_8d, times=10000, h=59,xreg=fourier(ts_daily, K=c(2,4),h=59))
+
+model8d <- fortify(NN_for_full_8d)
+model8d_data <- model8d[1838:1896,4]
+
+submission8d <- cbind.data.frame(date, model8d_data)
+names(submission8d) <- c("date", "load")
+
+write.csv(submission8d, "./Submissions/submission8d.csv", row.names = FALSE)
+```
