@@ -17,6 +17,8 @@ library(readxl) #import excel
 library(dplyr) #pipes
 library(forecast) #time series
 library(ggplot2)
+install.packages("TSdeeplearning")
+library(TSdeeplearning)
 ```
 
 ```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
@@ -80,6 +82,40 @@ autoplot(ts_daily_test)
 ```
 
 ```{r}
+#Create time series for external regressors
+temp <- read_excel(path="./Data/temperature.xlsx") 
+temp_daily <- temp %>%
+  mutate(temp_daily = rowMeans(select(temp, starts_with('t')), na.rm = TRUE))
+
+temp_daily <- cbind.data.frame(temp_daily$date, temp_daily$hr, temp_daily$temp_daily)
+
+temp_daily_wide <- reshape(temp_daily, idvar = "temp_daily$date", timevar = "temp_daily$hr", direction = "wide")
+
+temp_daily_avg <- temp_daily_wide %>%
+  mutate(temp_daily_avg = rowMeans(select(temp_daily_wide, starts_with('temp_daily$temp')), na.rm = TRUE))
+
+temp_daily_avg <- cbind.data.frame(temp_daily_avg$`temp_daily$date`, temp_daily_avg$temp_daily_avg)
+names(temp_daily_avg) <- c("date", "temp_daily")
+
+#Construct time series object
+ts_daily_temp <- msts(load_daily$daily_load, start = c(2005, 01, 01), end = c(2010, 12, 31),seasonal.periods = c(7,365.25))
+
+#Create train and test sets
+one_year = 365 #leave out one year of data for testing
+##Create train ts 
+ts_daily_train <- subset(ts_daily, end = length(ts_daily)-one_year)
+
+
+##Create test ts
+ts_daily_test <- subset(ts_daily, start = length(ts_daily)-one_year)
+
+autoplot(ts_daily_train)
+autoplot(ts_daily_test)
+
+
+```
+
+```{r}
 #Model 1 - STL + ETS model
 ETS_fit <-  stlf(ts_daily_train,h=365)
 
@@ -102,6 +138,31 @@ submission1 <- cbind.data.frame(date, model1_ets_data)
 names(submission1) <- c("date", "load")
 
 write.csv(submission1, "./Submissions/submission1.csv", row.names = FALSE)
+```
+
+```{r}
+#Model 1b - STL + ETS model
+ETS_fit2 <-  stlf(ts_daily_train, allow.multiplicative.trend=TRUE, h=365)
+
+#Plot foresting results
+autoplot(ETS_fit2) + ylab("Power Demand")
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(ETS_fit2, series="STL + ETS",PI=FALSE) +
+  ylab("Power Demand")
+
+#Run on full dataset to upload to Kaggle
+ETS_fit_full2 <- stlf(ts_daily, h=59)
+model1b_ets <- fortify(ETS_fit_full2)
+model1b_ets_data <- model1b_ets[1838:1896,4]
+
+submission1b <- cbind.data.frame(date, model1b_ets_data)
+names(submission1b) <- c("date", "load")
+
+write.csv(submission1b, "./Submissions/submission1b.csv", row.names = FALSE)
+
+
 ```
 
 ```{r}
@@ -155,12 +216,73 @@ write.csv(submission2, "./Submissions/submission2.csv", row.names = FALSE)
 ```
 
 ```{r}
-# TBATS can take time to fit
-TBATS_fit <- tbats(ts_daily)
 
-TBATS_for <- forecast(TBATS_fit, h=59)
+#Model 2 - ARIMA with fourier terms
+ARIMA_four_fit_2b <- auto.arima(ts_daily_train, 
+                             seasonal=FALSE,
+                             lambda=0,
+                             xreg=fourier(ts_daily_train, 
+                                          K=c(2,6)) 
+                             )
 
-model3 <- fortify(TBATS_for)
+ARIMA_four_for_2b <- forecast(ARIMA_four_fit_2b,
+                           xreg=fourier(ts_daily_train,
+                                        K=c(2,6),
+                                        h=365), #telling it you also need a forecast for the fourier external regressors, not just the fit -- so you add the h=### piece inside the fourier() function
+                           h=365
+                           ) 
+
+#Plot foresting results
+autoplot(ARIMA_four_for_2b) + ylab("Power")
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(ARIMA_four_for, series="ARIMA_FOURIER",PI=FALSE) +
+  ylab("Power")
+
+ARIMA_four_fit_full_2b <- auto.arima(ts_daily, 
+                             seasonal=FALSE,
+                             lambda=0,
+                             xreg=fourier(ts_daily, 
+                                          K=c(2,6)) 
+                             )
+
+ARIMA_forecast_full_2b <- forecast(ARIMA_four_fit_full_2b,
+                           xreg=fourier(ts_daily,
+                                        K=c(2,6),
+                                        h=59), #telling it you also need a forecast for the fourier external regressors, not just the fit -- so you add the h=### piece inside the fourier() function
+                           h=59
+                           ) 
+
+model2b <- fortify(ARIMA_forecast_full_2b)
+model2b_data <- model2b[1838:1896,4]
+
+submission2b <- cbind.data.frame(date, model2b_data)
+names(submission2b) <- c("date", "load")
+
+write.csv(submission2b, "./Submissions/submission2b.csv", row.names = FALSE)
+
+```
+
+```{r}
+# TBATS train
+TBATS_fit <- tbats(ts_daily_train)
+
+TBATS_for <- forecast(TBATS_fit, h=365)
+
+#Plot foresting results
+autoplot(TBATS_for) + ylab("Power")
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(TBATS_for, series="TBATS",PI=FALSE) +
+  ylab("Power")
+
+#Full dataset
+TBATS_fit_full <- tbats(ts_daily)
+TBATS_for_full <- forecast(TBATS_fit, h=59)
+
+model3 <- fortify(TBATS_for_full)
 model3_data <- model3[1838:1896,4]
 
 submission3 <- cbind.data.frame(date, model3_data)
@@ -170,3 +292,84 @@ write.csv(submission3, "./Submissions/submission3.csv", row.names = FALSE)
 
 ```
 
+```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+#You can play with the different values for p and P, you can also use xreg with Fourier term to model the multiple seasonality
+
+#Neural networks work well for non-linear methods
+
+#NN_fit <- nnetar(ts_act_power_daily_train,p=1,P=1)
+NN_fit <- nnetar(ts_daily_train)
+NN_for <- forecast(NN_fit, h=365)
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(NN_for, series="TBATS",PI=FALSE) +
+  ylab("Power")
+
+#Full dataset
+NN_fit_full <- nnetar(ts_daily)
+NN_for_full <- forecast(NN_fit_full, h=59)
+
+model4 <- fortify(NN_for_full)
+model4_data <- model4[1838:1896,4]
+
+submission4 <- cbind.data.frame(date, model4_data)
+names(submission4) <- c("date", "load")
+
+write.csv(submission4, "./Submissions/submission4.csv", row.names = FALSE)
+
+```
+
+```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+#Neural networks with fourier regressors -- use better fit from earlier models
+NN_fit_4b <- nnetar(ts_daily_train,xreg=fourier(ts_daily_train, K=c(2,6)))
+
+NN_for_4b <- forecast(NN_fit_4b, h=365,xreg=fourier(ts_daily_train, K=c(2,6),h=365)) 
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(NN_for_4b, series="Neural Network",PI=FALSE)+
+  ylab("Active Power")
+
+#Full dataset
+NN_fit_full_4b <- nnetar(ts_daily)
+NN_for_full_4b <- forecast(NN_fit_full_4b, h=59)
+
+model4b <- fortify(NN_for_full_4b)
+model4b_data <- model4b[1838:1896,4]
+
+submission4b <- cbind.data.frame(date, model4b_data)
+names(submission4b) <- c("date", "load")
+
+write.csv(submission4b, "./Submissions/submission4b.csv", row.names = FALSE)
+
+```
+
+```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+#Neural networks with external regressors -- use better fit from earlier models
+RNN_ts(ts_daily_train)
+
+#, xtlag = 4, uRNN = 2, Drate = 0, nEpochs = 10,
+Loss = "mse", AccMetrics = "mae",ActFn = "tanh",
+Split = 0.8, Valid = 0.1)
+
+NN_for_4b <- forecast(NN_fit_4b, h=365,xreg=fourier(ts_daily_train, K=c(2,6),h=365)) 
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(NN_for_4b, series="Neural Network",PI=FALSE)+
+  ylab("Active Power")
+
+#Full dataset
+NN_fit_full_4b <- nnetar(ts_daily)
+NN_for_full_4b <- forecast(NN_fit_full_4b, h=59)
+
+model4b <- fortify(NN_for_full_4b)
+model4b_data <- model4b[1838:1896,4]
+
+submission4b <- cbind.data.frame(date, model4b_data)
+names(submission4b) <- c("date", "load")
+
+write.csv(submission4b, "./Submissions/submission4b.csv", row.names = FALSE)
+
+```
