@@ -17,8 +17,6 @@ library(readxl) #import excel
 library(dplyr) #pipes
 library(forecast) #time series
 library(ggplot2)
-install.packages("TSdeeplearning")
-library(TSdeeplearning)
 ```
 
 ```{r, warning=FALSE, message=FALSE, cache=TRUE, autodep=TRUE, fig.align='center'}
@@ -82,7 +80,7 @@ autoplot(ts_daily_test)
 ```
 
 ```{r}
-#Create time series for external regressors
+#Create time series for external regressors - TEMPERATURE
 temp <- read_excel(path="./Data/temperature.xlsx") 
 temp_daily <- temp %>%
   mutate(temp_daily = rowMeans(select(temp, starts_with('t')), na.rm = TRUE))
@@ -98,20 +96,19 @@ temp_daily_avg <- cbind.data.frame(temp_daily_avg$`temp_daily$date`, temp_daily_
 names(temp_daily_avg) <- c("date", "temp_daily")
 
 #Construct time series object
-ts_daily_temp <- msts(load_daily$daily_load, start = c(2005, 01, 01), end = c(2010, 12, 31),seasonal.periods = c(7,365.25))
+ts_daily_temp <- msts(temp_daily_avg$temp_daily, start = c(2005, 01, 01), end = c(2010, 12, 31),seasonal.periods = c(7,365.25))
 
 #Create train and test sets
-one_year = 365 #leave out one year of data for testing
-##Create train ts 
-ts_daily_train <- subset(ts_daily, end = length(ts_daily)-one_year)
+ts_daily_temp_train <- subset(ts_daily_temp, end = length(ts_daily_temp)-one_year)
 
 
 ##Create test ts
-ts_daily_test <- subset(ts_daily, start = length(ts_daily)-one_year)
+ts_daily_temp_test <- subset(ts_daily_temp, start = length(ts_daily_temp)-one_year)
 
-autoplot(ts_daily_train)
-autoplot(ts_daily_test)
+autoplot(ts_daily_temp_train)
+autoplot(ts_daily_temp_test)
 
+#check correlation between temp and energy demand
 
 ```
 
@@ -332,8 +329,8 @@ autoplot(ts_daily) +
   ylab("Active Power")
 
 #Full dataset
-NN_fit_full_4b <- nnetar(ts_daily)
-NN_for_full_4b <- forecast(NN_fit_full_4b, h=59)
+NN_fit_full_4b <- nnetar(ts_daily,xreg=fourier(ts_daily, K=c(2,6)))
+NN_for_full_4b <- forecast(NN_fit_full_4b, h=59,xreg=fourier(ts_daily, K=c(2,6),h=59)) 
 
 model4b <- fortify(NN_for_full_4b)
 model4b_data <- model4b[1838:1896,4]
@@ -345,31 +342,109 @@ write.csv(submission4b, "./Submissions/submission4b.csv", row.names = FALSE)
 
 ```
 
-```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
-#Neural networks with external regressors -- use better fit from earlier models
-RNN_ts(ts_daily_train)
+```{r}
 
-#, xtlag = 4, uRNN = 2, Drate = 0, nEpochs = 10,
-Loss = "mse", AccMetrics = "mae",ActFn = "tanh",
-Split = 0.8, Valid = 0.1)
+#Model 5 - ARIMA with external regressors
+ARIMA_four_fit_5 <- auto.arima(ts_daily_train, 
+                             seasonal=FALSE,
+                             lambda=0,
+                             xreg=(ts_daily_temp_train))
 
-NN_for_4b <- forecast(NN_fit_4b, h=365,xreg=fourier(ts_daily_train, K=c(2,6),h=365)) 
+ARIMA_four_for_5 <- forecast(ARIMA_four_fit_5,
+                           xreg=(ts_daily_temp_train), h=365) 
+
+#Plot foresting results
+autoplot(ARIMA_four_for_5) + ylab("Power")
 
 #Plot model + observed data
 autoplot(ts_daily) +
-  autolayer(NN_for_4b, series="Neural Network",PI=FALSE)+
+  autolayer(ARIMA_four_for_5, series="ARIMA_FOURIER",PI=FALSE) +
+  ylab("Power")
+
+ARIMA_four_fit_full_5 <- auto.arima(ts_daily, 
+                             seasonal=FALSE,
+                             lambda=0,
+                             xreg=(ts_daily_temp))
+
+ARIMA_four_for_full_5 <- forecast(ARIMA_four_fit_full_5,
+                           xreg=(ts_daily_temp_train), h=59) 
+
+model5 <- fortify(ARIMA_four_for_full_5)
+model5_data <- model5[1838:1896,4]
+
+submission5 <- cbind.data.frame(date, model5_data)
+names(submission5) <- c("date", "load")
+
+write.csv(submission5, "./Submissions/submission5.csv", row.names = FALSE)
+```
+
+```{r}
+ARIMA_four_fit_5b <- auto.arima(ts_daily_train, 
+                             seasonal=FALSE,
+                             lambda=0,
+                             xreg=fourier(ts_daily_temp_train, 
+                                          K=c(2,6)) 
+                             )
+
+ARIMA_four_for_5b <- forecast(ARIMA_four_fit_5b,
+                           xreg=fourier(ts_daily_temp_train,
+                                        K=c(2,6),
+                                        h=365),
+                           h=365
+                           )
+
+#Plot foresting results
+autoplot(ARIMA_four_for_5b) + ylab("Power")
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(ARIMA_four_for_5b, series="ARIMA_FOURIER",PI=FALSE) +
+  ylab("Power")
+
+ARIMA_four_fit_full_5b <- auto.arima(ts_daily, 
+                             seasonal=FALSE,
+                             lambda=0,
+                             xreg=fourier(ts_daily_temp, 
+                                          K=c(2,6)) 
+                             )
+
+ARIMA_four_for_full_5b <- forecast(ARIMA_four_fit_full_5b,
+                           xreg=fourier(ts_daily_temp,
+                                        K=c(2,6),
+                                        h=59),
+                           h=59
+                           )
+
+model5b <- fortify(ARIMA_four_for_full_5b)
+model5b_data <- model5b[1838:1896,4]
+
+submission5b <- cbind.data.frame(date, model5b_data)
+names(submission5b) <- c("date", "load")
+
+write.csv(submission5b, "./Submissions/submission5b.csv", row.names = FALSE)
+```
+
+```{r NNETAR, echo=TRUE, message=FALSE, warning=FALSE}
+#Neural networks with external regressors
+NN_fit_6 <- nnetar(ts_daily_train,xreg=ts_daily_temp_train)
+
+NN_for_6 <- forecast(NN_fit_6, h=365,xreg=ts_daily_temp_train) 
+
+#Plot model + observed data
+autoplot(ts_daily) +
+  autolayer(NN_for_6, series="Neural Network",PI=FALSE)+
   ylab("Active Power")
 
 #Full dataset
-NN_fit_full_4b <- nnetar(ts_daily)
-NN_for_full_4b <- forecast(NN_fit_full_4b, h=59)
+NN_fit_full_6 <- nnetar(ts_daily,xreg=ts_daily_temp)
+NN_for_full_6 <- forecast(NN_fit_full_6, h=59,xreg=ts_daily_temp) 
 
-model4b <- fortify(NN_for_full_4b)
-model4b_data <- model4b[1838:1896,4]
+model6 <- fortify(NN_for_full_6)
+model6_data <- model6[1838:1896,4]
 
-submission4b <- cbind.data.frame(date, model4b_data)
-names(submission4b) <- c("date", "load")
+submission6 <- cbind.data.frame(date, model6_data)
+names(submission6) <- c("date", "load")
 
-write.csv(submission4b, "./Submissions/submission4b.csv", row.names = FALSE)
+write.csv(submission6, "./Submissions/submission6.csv", row.names = FALSE)
 
 ```
